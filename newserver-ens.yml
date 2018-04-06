@@ -1,0 +1,188 @@
+---
+- hosts: agents
+  become: true
+  serial: 4
+#increase serial to do this on more than 4 machines
+
+  vars:
+    user_name: yourusernamehere
+    user_password: 'xxxlongstringherexxx'
+      #Password is xxx ( made with mkpasswd --method=sha-512 command ) account is only usable from console!!
+
+# This file sets up bonding on CentOS 7.2/3 and adds local sudoer account for control in case things go wrong.
+  tasks:
+
+    - name: Create local admin user that is accessible from the console only!  Need just incase things go wrong with network config
+      user:
+       name: {{ user_name }}
+       shell: /bin/bash
+       groups: root
+       password: "{{ user_password }}"
+       append: yes
+
+    - name: Add user to sudoers
+      lineinfile: dest=/etc/sudoers
+                  regexp="{{ user_name }} ALL"
+                  line="{{ user_name }} ALL=(ALL) ALL"
+                  state=present
+
+    - name: Ensure tar is installed
+      yum: name=tar state=installed
+
+    - name: Ensure xz is installed
+      yum: name=xz state=installed
+
+    - name: Ensure unzip is installed
+      yum: name=unzip state=installed
+
+    - name: Ensure curl is installed
+      yum: name=curl state=installed
+
+    - name: Ensure ipset is installed
+      yum: name=ipset state=installed
+
+    - name: Ensure nano is installed
+      yum: name=nano state=installed
+
+    - name: Ensure net-tools is installed
+      yum: name=net-tools state=installed
+
+    - name: Ensure ntp is installed
+      yum: name=ntp state=installed
+
+    - name: Ensure ftp is installed
+      yum: name=ftp state=installed
+
+    - name: Ensure wget is installed
+      yum: name=wget state=installed
+
+    - name: Ensure dig(bind-utils) is installed
+      yum: name=bind-utils state=installed
+
+    - name: check to see if SELINUX is enforcing
+      shell: cat /etc/selinux/config
+      register: enforcing
+
+    - name: Disable SELINUX, required by mesosphere as it breaks things
+      lineinfile: dest=/etc/selinux/config
+                  regexp='^SELINUX=enforcing'
+                  line='SELINUX=disabled'
+      when: enforcing.stdout.find('SELINUX=enforcing') != -1
+      
+    - name: check for overlay.conf
+      stat:
+        path: /etc/modules-load.d/overlay.conf
+      register: overlayexists
+
+    - name: Enable the overlay driver in CentOS
+      lineinfile: dest=/etc/modules-load.d/overlay.conf
+                  regexp='^overlay'
+                  line='overlay'
+                  create=True
+      when: overlayexists.stat.exists == false
+
+    - name: Enable Bonding
+      shell: modprobe bonding
+
+    - name: Delete bond0 configuration file if present
+      file:
+       path: /etc/sysconfig/network-scripts/ifcfg-bond0
+       state: absent
+
+    - name: Delete eno1 configuration file if present
+      file:
+       path: /etc/sysconfig/network-scripts/ifcfg-eno1
+       state: absent
+
+    - name: Delete eno2 configuration file if present
+      file:
+       path: /etc/sysconfig/network-scripts/ifcfg-eno2
+       state: absent
+
+    - name: Delete eth0 configuration file if present ( cleaning up )
+      file:
+       path: /etc/sysconfig/network-scripts/ifcfg-eth0
+       state: absent
+
+     - name: Create Bond0 Configuration file in /etc/sysconfig/network-scripts
+      lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0
+                  regexp='^'
+                  line='DEVICE=bond0\nTYPE=Bond\nNAME=bond0\nBONDING_MASTER=yes\nBOOTPROTO=dhcp\nONBOOT=yes\nPEERDNS=yes\nPERSISTENT_DHCLIENT=1\nBONDING_OPTS="mode=5 miimon=100 primary=ens192"'
+                  create=True
+
+    - name: Create primary interface ens192 configuration file for bond in /etc/sysconfig/network-scripts
+      lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-ens192
+                  regexp='^'
+                  line='TYPE=Ethernet\nNM_CONTROLLED=no\nUSERCTL=yes\nHWADDR={{ansible_ens192.macaddress}}\nONBOOT=yes\nBOOTPROTO=none\nPEERDNS=yes\nMASTER=bond0\nSLAVE=yes'
+                  create=True
+
+    - name: Create secondary interface ens224 configuration file for bond in /etc/sysconfig/network-scripts
+      lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-ens224
+                  regexp='^'
+                  line='TYPE=Ethernet\nNM_CONTROLLED=no\nUSERCTL=yes\nHWADDR={{ansible_ens224.macaddress}}\nONBOOT=yes\nBOOTPROTO=none\nPEERDNS=yes\nMASTER=bond0\nSLAVE=yes'
+                  create=True
+
+    - name: restart server
+      shell: /bin/sleep 5 && /sbin/shutdown -r now "Reboot triggered by Ansible"
+      async: 1
+      poll: 0
+      ignore_errors: true
+
+    - name: waiting for the servers to come back
+      wait_for:
+        port: 22
+        state: started
+        host: '{{ ansible_ssh_host | default(inventory_hostname) }}'
+        delay: 30
+        timeout: 1200
+        sleep: 10
+      become: false
+      connection: local
+      
+    - name: check for docker yum repo file
+      stat:
+        path: /etc/yum.repos.d/docker.repo
+      register: drepoexists
+
+    - name: Create docker repo file and fill it with necessary infomation
+      lineinfile: dest=/etc/yum.repos.d/docker.repo
+                  regexp='^'
+                  line='[dockerrepo]\nname=Docker Repository\nbaseurl=https://yum.dockerproject.org/repo/main/centos/$releasever/\nenabled=1\ngpgcheck=1\ngpgkey=https://yum.dockerproject.org/gpg'
+                  create=True
+      when: drepoexists.stat.exists == false
+
+    - name: check for docker service directory
+      stat:
+        path: /etc/systemd/system/docker.service.d
+      register: ddirexists
+
+    - name: create docker service directory
+#      shell: mkdir -p /etc/systemd/system/docker.service.d
+      file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+      when: ddirexists.stat.exists == false
+
+    - name: check to see if docker overlay conf exists
+      stat:
+        path: /etc/systemd/system/docker.service.d/override.conf
+      register: overlayconfexists
+
+    - name: Create docker overlay configuration file
+      lineinfile: dest=/etc/systemd/system/docker.service.d/override.conf
+                  regexp='^'
+                  line='[Service]\nExecStart=\nExecStart=/usr/bin/dockerd --storage-driver=overlay'
+                  create=True
+      when: overlayconfexists.stat.exists == false
+
+    - name: Ensure docker engine 1.13.1 is installed
+      yum: name=docker-engine-1.13.1 state=installed
+
+    - name: Ensure docker engine selinux 1.13.1 is installed
+      yum: name=docker-engine-selinux-1.13.1 state=installed
+
+    - name: start docker
+      shell: systemctl start docker
+
+    - name: enable docker
+      shell: systemctl enable docker
