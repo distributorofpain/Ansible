@@ -24,6 +24,6 @@ Ceph Deployments ( files start with Ceph in the name )
 3. Place all new servers except the primary admin node under [newservers] with this format 'servername ansible_host=x.x.x.x' ( replace x's with server ip ).  Add the primary admin node under [monprimary] section with the same format.
 4. Run ansible-playbook ceph_mon_primary.yml first and ONLY once.
 5. Run ansible-playbook ceph_new_server.yml then after completion, move all the servers to their appropriate section in the ansible hosts file.
-6. Run ansible-playbook ceph_hosts_file.yml
+6. Run ansible-playbook ceph_hostsfile.yml
 7. When it finishes, the servers are ready for ceph deployment using ceph deploy ( or manual deployment )
 8. if you need to add more servers later, just run step 5 & 6 again ( step 6 can be run when you are ready )
