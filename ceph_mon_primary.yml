@@ -1,0 +1,173 @@
+---
+- hosts: monprimary
+  become: true
+  serial: 5
+
+  vars:
+    # Define ceph user
+    ceph_user_name: <usernamehere>
+    ceph_password: ''
+    # Password for ceph_password is made with mkpasswd --method=sha-512 command
+
+    # Define admin user
+    admin_user_name: <usernamehere>
+    admin_password: ''
+    # Password for admin_password is made with mkpasswd --method=sha-512 command
+
+  tasks:
+
+    - name: Create ceph-deploy admin user with admin privledges.  ( Needed for ceph-deploy )
+      user:
+       name: "{{ ceph_user_name }}"
+       shell: /bin/bash
+       groups: wheel
+       password: "{{ ceph_password }}"
+       append: yes
+       generate_ssh_key: yes
+       ssh_key_bits: 2048
+       ssh_key_file: .ssh/id_rsa
+       state: present
+       createhome: yes        
+       home: /home/{{ ceph_user_name }}
+
+    - name: Add ceph user to sudoers
+      lineinfile: dest=/etc/sudoers
+                  regexp="{{ ceph_user_name }} ALL"
+                  line="{{ ceph_user_name }} ALL=(ALL) ALL"
+                  state=present
+
+    - name: Create admin user with admin privledges.
+      user:
+       name: "{{ admin_user_name }}"
+       shell: /bin/bash
+       groups: wheel
+       password: "{{ admin_password }}"
+       append: yes
+       generate_ssh_key: yes
+       ssh_key_bits: 2048
+       ssh_key_file: .ssh/id_rsa
+       state: present
+       createhome: yes        
+       home: /home/{{ admin_user_name }}
+
+    - name: Add admin user to sudoers
+      lineinfile: dest=/etc/sudoers
+                  regexp="{{ admin_user_name }} ALL"
+                  line="{{ admin_user_name }} ALL=(ALL) ALL"
+                  state=present
+
+    - name: Add user {{ ceph_user_name }} to sudo
+      lineinfile:
+        path: /etc/sudoers.d/{{ ceph_user_name }}
+        line: '{{ ceph_user_name }} ALL=(ALL) NOPASSWD: ALL'
+        state: present
+        mode: 0440
+        create: yes
+        validate: 'visudo -cf %s'
+
+    - name: Upgrade all yum packages
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Ensure ntpdate is installed
+      yum: name=ntpdate state=installed
+
+    - name: Ensure ntp-doc is installed
+      yum: name=ntp-doc state=installed
+
+    - name: Ensure tar is installed
+      yum: name=tar state=installed
+
+    - name: Ensure xz is installed
+      yum: name=xz state=installed
+
+    - name: Ensure unzip is installed
+      yum: name=unzip state=installed
+
+    - name: Ensure curl is installed
+      yum: name=curl state=installed
+
+    - name: Ensure ipset is installed
+      yum: name=ipset state=installed
+
+    - name: Ensure nano is installed
+      yum: name=nano state=installed
+
+    - name: Ensure net-tools is installed
+      yum: name=net-tools state=installed
+
+    - name: Ensure ftp is installed
+      yum: name=ftp state=installed
+
+    - name: Ensure wget is installed
+      yum: name=wget state=installed
+
+    - name: Ensure dig(bind-utils) is installed
+      yum: name=bind-utils state=installed
+
+    - name: Ensure ntp is installed
+      yum: name=ntp state=installed
+
+    - name: enable service ntpd and ensure it is not masked
+      systemd:
+        name: ntpd
+        enabled: yes
+        masked: no
+
+    - name: Make sure a NTP service is running
+      systemd:
+        state: started
+        name: ntpd
+
+    - name: Check to see if SELINUX is enforcing
+      shell: cat /etc/selinux/config
+      register: enforcing
+
+    - name: Change SELINUX to permissive mode, required by ceph as it breaks things
+      lineinfile: dest=/etc/selinux/config
+                  regexp='^SELINUX=enforcing'
+                  line='SELINUX=permissive'
+      when: enforcing.stdout.find('SELINUX=enforcing') != -1
+
+    - name: Set SELINUX to log only
+      shell: setenforce 0
+      when: enforcing.stdout.find('SELINUX=enforcing') != -1
+
+    - name: Make sure a firewall service is stopped
+      systemd:
+        state: stopped
+        name: firewalld
+
+    - name: Disable firewall service
+      systemd:
+        name: firewalld
+        enabled: no
+
+    - name: Grab current hostname ( get ready to change it if its still localhost )
+      command: hostname
+      register: hostname_output
+
+    - name: reformat register output from hostname command for the hostname command
+      set_fact:
+         hostname_out: "{{ hostname_output.stdout }}"
+
+    - name: Change hostname of server to match ansible inventory host file
+      hostname:
+        name: '{{ inventory_hostname  }}'
+      when: hostname_out | search("localhost")
+
+    - name: Enable Bonding
+      shell: modprobe bonding
+
+    - name: Delete existing config file if present
+      file:
+        path: /home/cephusr/.ssh/config
+        state: absent
+
+    - name: Create SSH configuration file for ceph user
+      lineinfile: dest=/home/cephusr/.ssh/config
+                  regexp=''
+                  line='StrictHostKeyChecking no\nLogLevel QUIET'
+                  create=True
+
