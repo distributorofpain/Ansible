@@ -11,6 +11,8 @@ NOTE: if you have different types of NICs, then you will have to divide up the d
 4. Run ansible-playbook newserver-<NICTYPEHERE>.yml
 5. When it finishes, the server is ready for mesosphere ( or other things )
 
+
+
 Ceph Deployments ( files start with Ceph in the name )
 1. Edit the hosts file: /etc/ansible/hosts
 2. Add five sections
