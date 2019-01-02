@@ -1,0 +1,51 @@
+# This file creates a host file on all hosts based on the inventory file and the domain you set below
+# Make sure to set the primarydomain below.
+# localhost entries are retained and a space is added between those and the new entries
+# Existing matching entries are left alone
+# Format is as follows:  x.x.x.x hostname hostname.primarydomain.com
+
+---
+- hosts: mons,osds,rgws,monprimary
+  become: true
+  serial: 5
+
+  vars:
+    # Set primary server for later user
+    monprimaryserver: "{{ groups['monprimary'][0] }}"
+
+    # Set domain here
+    primarydomain: "yourdomain.com"
+
+  tasks:
+  
+   - name: update host file with Primary Monitor
+     lineinfile:
+       dest: /etc/hosts
+       regexp: '{{ hostvars[item].ansible_default_ipv4.address }}.*{{ item }} {{item}}.{{primarydomain}}$'
+       line: "{{ hostvars[item].ansible_default_ipv4.address }} {{item}} {{item}}.{{primarydomain}}"
+       state: present
+     with_items: "{{ groups.monprimary }}"
+
+   - name: update host file wth monitors
+     lineinfile:
+       dest: /etc/hosts
+       regexp: '{{ hostvars[item].ansible_default_ipv4.address }}.*{{ item }} {{item}}.{{primarydomain}}$'
+       line: "{{ hostvars[item].ansible_default_ipv4.address }} {{item}} {{item}}.{{primarydomain}}"
+       state: present
+     with_items: "{{ groups.mons }}"
+
+   - name: update host file with OSDs
+     lineinfile:
+       dest: /etc/hosts
+       regexp: '{{ hostvars[item].ansible_default_ipv4.address }}.*{{ item }} {{item}}.{{primarydomain}}$'
+       line: "{{ hostvars[item].ansible_default_ipv4.address }} {{item}} {{item}}.{{primarydomain}}"
+       state: present
+     with_items: "{{ groups.osds }}"
+
+   - name: update host file with RGWs
+     lineinfile:
+       dest: /etc/hosts
+       regexp: '{{ hostvars[item].ansible_default_ipv4.address }}.*{{ item }} {{item}}.{{primarydomain}}$'
+       line: "{{ hostvars[item].ansible_default_ipv4.address }} {{item}} {{item}}.{{primarydomain}}"
+       state: present
+     with_items: "{{ groups.rgws }}"
