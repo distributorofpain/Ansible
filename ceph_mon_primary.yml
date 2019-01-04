@@ -33,7 +33,7 @@
     - name: Add ceph user to sudoers
       lineinfile: dest=/etc/sudoers
                   regexp="{{ ceph_user_name }} ALL"
-                  line="{{ ceph_user_name }} ALL=(ALL) ALL"
+                  line="{{ ceph_user_name }} ALL=(ALL) NOPASSWD:ALL"
                   state=present
 
     - name: Create admin user with admin privledges.
@@ -53,13 +53,13 @@
     - name: Add admin user to sudoers
       lineinfile: dest=/etc/sudoers
                   regexp="{{ admin_user_name }} ALL"
-                  line="{{ admin_user_name }} ALL=(ALL) ALL"
+                  line="{{ admin_user_name }} ALL=(ALL) NOPASSWD:ALL"
                   state=present
 
     - name: Add user {{ ceph_user_name }} to sudo
       lineinfile:
         path: /etc/sudoers.d/{{ ceph_user_name }}
-        line: '{{ ceph_user_name }} ALL=(ALL) NOPASSWD: ALL'
+        line: '{{ ceph_user_name }} ALL=(ALL) NOPASSWD:ALL'
         state: present
         mode: 0440
         create: yes
