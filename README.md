@@ -27,3 +27,8 @@ Ceph Deployments ( files start with Ceph in the name )
 6. Run ansible-playbook ceph_hostsfile.yml
 7. When it finishes, the servers are ready for ceph deployment using ceph deploy ( or manual deployment )
 8. if you need to add more servers later, just run step 5 & 6 again ( step 6 can be run when you are ready )
+
+
+CentOS 8
+CentOS 8 Folder contains the updated CentOS preflight scripts used for Ceph Deployments on CentOS 8 ( which is probably going to be Octopus or higher )
+The sections for the inventory file are the same as before, just note that if you are using ceph-ansible to deploy, you will need to use a separate hosts file, so it may be best to use a host file and key in one directory for these scripts and a second for the ceph-ansible sitting in the ceph-ansible directory.  If managing multiple clusters it would make sense to have a folder with scripts, keys and hosts file for each cluster.
