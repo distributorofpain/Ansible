@@ -29,6 +29,8 @@ Ceph Deployments ( files start with Ceph in the name )
 8. if you need to add more servers later, just run step 5 & 6 again ( step 6 can be run when you are ready )
 
 
+
+
 CentOS 8
 
 CentOS 8 Folder contains the updated CentOS preflight scripts used for Ceph Deployments on CentOS 8 ( which is probably going to be Octopus or higher )
