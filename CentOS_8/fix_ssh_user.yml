@@ -1,0 +1,33 @@
+---
+- hosts: newservers
+  become: true
+  serial: 100
+
+  vars:
+    # Define ceph user
+    ceph_user_name: cephusr
+
+    # Make sure to Define public key path at bottom!!
+
+  tasks:
+
+    - name: Add ceph user to sudoers
+      lineinfile: dest=/etc/sudoers
+                  regexp="{{ ceph_user_name }} ALL"
+                  line="{{ ceph_user_name }} ALL=(ALL) NOPASSWD:ALL"
+                  state=present
+
+    - name: Add user {{ ceph_user_name }} to sudo
+      lineinfile:
+        path: /etc/sudoers.d/{{ ceph_user_name }}
+        line: '{{ ceph_user_name }} ALL=(ALL) NOPASSWD:ALL'
+        state: present
+        mode: 0440
+        create: yes
+        validate: 'visudo -cf %s'
+
+    - name: Set authorized key taken from file
+      authorized_key:
+        user: "{{ ceph_user_name }}"
+        state: present
+        key: "{{ lookup('file', '/path/to/id_rsa.pub') }}"
