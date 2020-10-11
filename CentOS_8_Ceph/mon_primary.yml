@@ -3,6 +3,7 @@
 # make sure to create a monprimary section and place the primary mon there.
 # Password for ceph_password is encrypted with "openssl passwd -6" command on CentOS 8 to use in this file.
 # You might want to comment out the open vm tools below if you deploy monitors to physical machines.  ( also other tools you may not use )
+# Once chrony in installed on the primary monitor, make sure to login to that server, set the time server of choice and disable the other entries, then set the network to allow for your network
 # WARNING - Disables firewall and SELINUX below ( comment out or delete those sections if not desired )
 
 ---
